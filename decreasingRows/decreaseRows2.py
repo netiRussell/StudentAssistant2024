@@ -26,10 +26,6 @@ def getDistance(location1, location2):
 # - Function for finding coordinates of a given zipcode in ZipByKyle sheet -
 def findCoordinates(zipcode, wb):
   coordinatesDataSheet = wb['RawData']
-  # for i in range(1, coordinatesDataSheet.max_row+1):
-  #   if(isinstance(coordinatesDataSheet['A' + str(i)].value, int)):
-  #     if( coordinatesDataSheet['A' + str(i)].value == zipcode):
-  #       return (coordinatesDataSheet['D' + str(i)].value, coordinatesDataSheet['E' + str(i)].value)
   
   for row in coordinatesDataSheet.iter_rows(min_row=None, max_row=None, min_col=1, max_col=1, values_only=False):
     for cell in row:
@@ -43,7 +39,7 @@ def findCoordinates(zipcode, wb):
 # -------------------------------------------------------------------------------------------------------------------- #
 
 # - Load the Excel file -
-wb = load_workbook('data.xlsx')
+wb = load_workbook('data15.xlsx')
 coordinatesSrc = load_workbook('CAcoordinates.xlsx', read_only=True)
 
 # - Make sure mergedZipCodes sheet doesn't exist -
@@ -73,6 +69,7 @@ while( sortedData.max_row != decreaseUntil ):
     print(currentZipCode, " can't be found in coordinates source excel file [outer while loop]")
     continue
 
+  currentHistory = ''
   if( not sortedData['RY' + str(currentIterator)].value or sortedData['RY' + str(currentIterator)].value == None):
     currentHistory = str(currentZipCode)
   else:
@@ -110,13 +107,13 @@ while( sortedData.max_row != decreaseUntil ):
   # Acommodate history of the changed row
   historyColLD = sortedData['RY' + str(rowOfLD)].value
   if ( not historyColLD or historyColLD == None ):
-    historyColLD = currentHistory
+    sortedData['RY' + str(rowOfLD)].value = currentHistory
   else:
-    historyColLD = str(historyColLD) + ' -> ' + currentHistory
+    sortedData['RY' + str(rowOfLD)].value = str(historyColLD) + ' -> ' + currentHistory
 
   print(rowOfLD) # to be deleted
 
 
 # - Save changes -
-wb.save('data.xlsx')
+wb.save('data10.xlsx')
 
