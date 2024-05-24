@@ -43,12 +43,13 @@ wb = load_workbook('data15.xlsx')
 coordinatesSrc = load_workbook('CAcoordinates.xlsx', read_only=True)
 
 # - Make sure mergedZipCodes sheet doesn't exist -
-if( 'mergedZipCodes' in wb.sheetnames ):
-  del wb['mergedZipCodes']
+# if( 'mergedZipCodes' in wb.sheetnames ):
+#   del wb['mergedZipCodes']
 
 # - Copy the Top457-Dist sheet -
-sortedData = wb.copy_worksheet(wb['Top457-Dist'])
-sortedData.title = 'mergedZipCodes'
+sortedData = wb['mergedZipCodes']
+# sortedData = wb.copy_worksheet(wb['Top457-Dist'])
+# sortedData.title = 'mergedZipCodes'
 
 # - Find range -
 decreaseUntil = int(input("Please, enter the number to which you'd like to decrease number of rows in the table: "))
@@ -115,5 +116,5 @@ while( sortedData.max_row != decreaseUntil ):
 
 
 # - Save changes -
-wb.save('data10.xlsx')
+wb.save('data12.xlsx')
 
