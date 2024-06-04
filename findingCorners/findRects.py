@@ -5,13 +5,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from openpyxl import Workbook, load_workbook
 
+# ! Settings:
+imgPath = 'img/sample.png' # path to the image to be analyzed
+showImgWithPoints = True # True = would show image with points drawn on it. False = would show found points plotted on a graph
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+
 # - Create an Excel file that will contain all the coordinates -
 wb = Workbook()
 ws = wb.active
 ws.append(['Top left X', 'Top left Y', 'Width', 'Height'])
 
 # - Get img and prepare it for contour detection -
-img = cv2.imread('img/sample.png')
+img = cv2.imread(imgPath)
 heightImg, widthImg, channels = img.shape
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 ret,thresh = cv2.threshold(gray,50,255,0)
@@ -82,7 +89,7 @@ for row in ws.iter_rows(min_row=2, max_row=None, min_col=None, max_col=None, val
    coordinatesWS['B' + str(row[0].row)] = '(' + str(row[0].value + row[2].value) + ', ' + str(row[1].value) + ')'
    coordinatesWS['C' + str(row[0].row)] = '(' + str(row[0].value) + ', ' + str(row[1].value + row[3].value) + ')'
    coordinatesWS['D' + str(row[0].row)] = '(' + str(row[0].value + row[2].value) + ', ' + str(row[1].value + row[3].value) + ')'
-   coordinatesWS['E' + str(row[0].row)] = int(deptNumber)
+   coordinatesWS['E' + str(row[0].row)] = deptNumber
 
 
 # - Save the Excel file -
@@ -99,16 +106,17 @@ for row in coordinatesWS.iter_rows(min_row=2, max_row=None, min_col=None, max_co
       x_data = np.append(x_data, holder[0])
       y_data = np.append(y_data, holder[1])
 
-# - Plot the given points -
-fig, (ax1, ax2) = plt.subplots(1, 2)
-fig.suptitle('Plots')
-ax1.scatter(x_data, y_data)
-ax1.set_ylim(bottom=heightImg, top=0 )
-ax1.set_xlim(left=0, right=widthImg )
-ax2.imshow(img)
-plt.show()
-
-# - Show img with point -
-# cv2.imshow("Shapes", img)
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
+if( showImgWithPoints):
+   # - Show img with point -
+   cv2.imshow("Shapes", img)
+   cv2.waitKey(0)
+   cv2.destroyAllWindows()
+else :
+   # - Plot the given points -
+   fig, (ax1, ax2) = plt.subplots(1, 2)
+   fig.suptitle('Plots')
+   ax1.scatter(x_data, y_data)
+   ax1.set_ylim(bottom=heightImg, top=0 )
+   ax1.set_xlim(left=0, right=widthImg )
+   ax2.imshow(img)
+   plt.show()

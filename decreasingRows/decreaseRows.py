@@ -1,5 +1,7 @@
 # - Main imports -
 from openpyxl import Workbook, load_workbook
+from geopy.distance import great_circle
+from geopy.distance import geodesic
 import sys
 
 # LOGIC:
@@ -14,43 +16,63 @@ import sys
   # 5) Do 1-4 until certain number of rows is reached.
 
 
+# ! Settings:
+teuWBname = 'data13.xlsx' # Name of Excel file that holds TEUs
+teuTableName = 'Teu' # Name of Table that holds TEU with zipcodes
+columnZipTeu = 'A' # Column in teuTableName that holds zipcodes
+columnTeu = 'C' # Column in teuTableName that holds TEU weights
+numberOfUselessTopRows = 1 # Number of useless rows on top of TEU table
+numberOfUselessBottomRows = 2 # Number of useless rows on bottom of TEU table
+
+coordinatesWBname = 'data13.xlsx' # Name of Excel file that holds long and lat
+coordinatesTableName = 'zip_code_database' # Name of Table that holds long and lat with zipcodes
+columnLatCoord = 'M' # Column in coordinatesTableName that holds Latitudes
+columnLongCoord = 'N' # Column in coordinatesTableName that holds Longitudes
+
+startOver = False # True = combine rows from the main TEU table; False = combine rows from the existing "mergedZipCodes" table
+
+
+
+
 # -------------------------------------------------------------------------------------------------------------------- #
 
 
 # - Function for finding a distance between two coordinates -
 def getDistance(location1, location2):
-  from geopy.distance import great_circle
-  from geopy.distance import geodesic
-
   return geodesic(location1, location2).miles
 
-# - Function for finding coordinates of a give zipcode in ZipByKyle sheet -
+# - Function for finding coordinates of a given zipcode in ZipByKyle sheet -
 def findCoordinates(zipcode, wb):
-  coordinatesDataSheet = wb['RawData']
-  for i in range(1, coordinatesDataSheet.max_row+1):
-    if(isinstance(coordinatesDataSheet['A' + str(i)].value, int)):
-      if( coordinatesDataSheet['A' + str(i)].value == zipcode):
-        return (coordinatesDataSheet['D' + str(i)].value, coordinatesDataSheet['E' + str(i)].value)
+  coordinatesDataSheet = wb[coordinatesTableName]
+  
+  for row in coordinatesDataSheet.iter_rows(min_row=None, max_row=None, min_col=1, max_col=1, values_only=False):
+    for cell in row:
+      if( isinstance(cell.value, int) ):
+        if( cell.value == zipcode ):
+          return (coordinatesDataSheet[columnLatCoord + str(cell.row)].value, coordinatesDataSheet[columnLongCoord + str(cell.row)].value)
+  # if nothing found
+  return (-1, -1)
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
 
 # - Load the Excel file -
-wb = load_workbook('data.xlsx')
-coordinatesSrc = load_workbook('MergeNodes.xlsx')
+wb = load_workbook(teuWBname)
+coordinatesSrc = load_workbook(coordinatesWBname, read_only=True)
 
 # - Make sure mergedZipCodes sheet doesn't exist -
-if( 'mergedZipCodes' in wb.sheetnames ):
+if( 'mergedZipCodes' in wb.sheetnames and startOver ):
   del wb['mergedZipCodes']
 
-# - Copy the Top457-Dist sheet -
-sortedData = wb.copy_worksheet(wb['Top457-Dist'])
-sortedData.title = 'mergedZipCodes'
+if( startOver ):
+  # - Copy the Top457-Dist sheet -
+  sortedData = wb.copy_worksheet(wb[teuTableName])
+  sortedData.title = 'mergedZipCodes'
+else :
+  sortedData = wb['mergedZipCodes']
 
 # - Find range -
 decreaseUntil = int(input("Please, enter the number to which you'd like to decrease number of rows in the table: "))
-numberOfUselessTopRows = 7
-numberOfUselessBottomRows = 1
 decreaseUntil = decreaseUntil + numberOfUselessTopRows + numberOfUselessBottomRows
 
 # - Iterate -
@@ -58,16 +80,24 @@ decreaseUntil = decreaseUntil + numberOfUselessTopRows + numberOfUselessBottomRo
 # Find the last row with useful data
 currentIterator = sortedData.max_row - numberOfUselessBottomRows
 
-while( sortedData.max_row != decreaseUntil ):
+while( sortedData.max_row > decreaseUntil ):
   # Find and save values of the row
-  currentCoordinates = findCoordinates(sortedData['B' + str(currentIterator)].value, coordinatesSrc)
+  currentZipCode = sortedData[columnZipTeu + str(currentIterator)].value
+  currentCoordinates = findCoordinates(currentZipCode, coordinatesSrc)
+  if(currentCoordinates == (-1,-1)):
+    sortedData.delete_rows(currentIterator)
+    currentIterator -= 1
+    
+    print(currentZipCode, " can't be found in coordinates source excel file: coordinatesWBname [outer while loop], currentIterator = ", currentIterator)
+    continue
 
+  currentHistory = ''
   if( not sortedData['RY' + str(currentIterator)].value or sortedData['RY' + str(currentIterator)].value == None):
-    currentHistory = str(sortedData['B' + str(currentIterator)].value)
+    currentHistory = str(currentZipCode)
   else:
-    currentHistory = '[(' + str(sortedData['RY' + str(currentIterator)].value) + ')' + '->' + str(sortedData['B' + str(currentIterator)].value) + ']'
+    currentHistory = '[(' + str(sortedData['RY' + str(currentIterator)].value) + ')' + '->' + str(currentZipCode) + ']'
 
-  currentWeight = sortedData['C' + str(currentIterator)].value
+  currentWeight = sortedData[columnTeu + str(currentIterator)].value
 
   # Delete the row, shift currentIterator to the upper row
   sortedData.delete_rows(currentIterator)
@@ -79,18 +109,29 @@ while( sortedData.max_row != decreaseUntil ):
 
   # Find zipcode with the lowest distance
   for i in range(1, sortedData.max_row+1):
-      if(isinstance(sortedData['B' + str(i)].value, int)):
-        holder = getDistance(currentCoordinates, findCoordinates(sortedData['B' + str(i)].value, coordinatesSrc))
+      zipCode = sortedData[columnZipTeu + str(i)].value
+
+      if(isinstance(zipCode, int)):
+        holder = findCoordinates(zipCode, coordinatesSrc)
+        if(holder == (-1,-1)):
+          print(zipCode, " can't be found in coordinates source excel file [inner for loop]")
+          continue
+        
+        holder = getDistance(currentCoordinates, findCoordinates(zipCode, coordinatesSrc))
+
         if( holder < lowestDistance):
           lowestDistance = holder
           rowOfLD = i
 
   # Add weight of the deleted row to the found row
-  sortedData['C' + str(rowOfLD)].value = sortedData['C' + str(rowOfLD)].value + currentWeight
-  if ( not sortedData['RY' + str(rowOfLD)].value or sortedData['RY' + str(rowOfLD)].value == None ):
+  sortedData[columnTeu + str(rowOfLD)].value = sortedData[columnTeu + str(rowOfLD)].value + currentWeight
+
+  # Acommodate history of the changed row
+  historyColLD = sortedData['RY' + str(rowOfLD)].value
+  if ( not historyColLD or historyColLD == None ):
     sortedData['RY' + str(rowOfLD)].value = currentHistory
   else:
-    sortedData['RY' + str(rowOfLD)].value = str(sortedData['RY' + str(rowOfLD)].value) + ' -> ' + currentHistory
+    sortedData['RY' + str(rowOfLD)].value = str(historyColLD) + ' -> ' + currentHistory
 
   print(rowOfLD) # to be deleted
 
